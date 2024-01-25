@@ -54,11 +54,14 @@ fn worker_impl(
     let mut event_loop = EventLoop::<State>::try_new().unwrap();
     let loop_handle = event_loop.handle();
 
-    let mut state = match State::new(&globals, &event_queue.handle(), loop_handle.clone(), reply_tx)
-    {
-        Some(state) => state,
-        None => return,
-    };
+    let mut state =
+        match State::new(&globals, &event_queue.handle(), loop_handle.clone(), reply_tx.clone()) {
+            Some(state) => state,
+            None => return,
+        };
+
+    // 'reconnect: loop {
+    //     let loop_handle = loop_handle.clone();
 
     loop_handle
         .insert_source(rx_chan, |event, _, state| {
@@ -92,13 +95,34 @@ fn worker_impl(
         })
         .unwrap();
 
-    WaylandSource::new(connection, event_queue).insert(loop_handle).unwrap();
+    let insert_registration = WaylandSource::new(connection, event_queue).insert(loop_handle);
+    println!("insert_registration: {:#?}", insert_registration);
+
+    if let Err(e) = insert_registration {
+        // #[cfg(feature = "debug")]
+        let err_msg = format!("Failed to insert wayland source: {:#?}", e);
+        println!("{}", err_msg);
+        let _ = state.reply_tx.send(Err(e.error.into()));
+        // return Err(Error::new(ErrorKind::Other, err_msg));
+        return;
+    }
 
     loop {
-        event_loop.dispatch(None, &mut state).unwrap();
+        let dispatch_resp = event_loop.dispatch(None, &mut state);
+        println!("dispatch_resp: {:?}", dispatch_resp);
+        if let Err(e) = dispatch_resp {
+            // #[cfg(feature = "debug")]
+            let err_msg = format!("Error while dispatching: {:#?}", e);
+            println!("{}", err_msg);
+            let _ = state.reply_tx.send(Err(e.into()));
+            state.exit = true;
+        }
 
         if state.exit {
+            // break 'reconnect;
             break;
         }
     }
+    // }
+    println!("smithay-clipboard worker thread exited");
 }
