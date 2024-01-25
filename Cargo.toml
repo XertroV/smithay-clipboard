@@ -14,6 +14,7 @@ rust-version = "1.65.0"
 libc = "0.2.149"
 sctk = { package = "smithay-client-toolkit", version = "0.18.0", default-features = false, features = ["calloop"] }
 wayland-backend = { version = "0.3.0", default_features = false, features = ["client_system"] }
+log = { version = "0.4", features = ["std"] }
 
 [dev-dependencies]
 sctk = { package = "smithay-client-toolkit", version = "0.18.0", default-features = false, features = ["calloop", "xkbcommon"] }

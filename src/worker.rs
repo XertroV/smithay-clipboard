@@ -68,40 +68,50 @@ fn worker_impl(
             if let channel::Event::Msg(event) = event {
                 match event {
                     Command::StorePrimary(contents) => {
+                        log::debug!("store primary: {:?}", contents);
                         state.store_selection(SelectionTarget::Primary, contents);
                     },
                     Command::Store(contents) => {
+                        log::debug!("store clipboard: {:?}", contents);
                         state.store_selection(SelectionTarget::Clipboard, contents);
                     },
                     Command::Load if state.data_device_manager_state.is_some() => {
+                        log::debug!("load clipboard");
                         if let Err(err) = state.load_selection(SelectionTarget::Clipboard) {
+                            log::debug!("load clipboard error: {:?}", err);
                             let _ = state.reply_tx.send(Err(err));
                         }
                     },
                     Command::LoadPrimary if state.data_device_manager_state.is_some() => {
+                        log::debug!("load primary");
                         if let Err(err) = state.load_selection(SelectionTarget::Primary) {
+                            log::debug!("load primary error: {:?}", err);
                             let _ = state.reply_tx.send(Err(err));
                         }
                     },
                     Command::Load | Command::LoadPrimary => {
+                        log::debug!("load or load primary other, not supported");
                         let _ = state.reply_tx.send(Err(Error::new(
                             ErrorKind::Other,
                             "requested selection is not supported",
                         )));
                     },
-                    Command::Exit => state.exit = true,
+                    Command::Exit => {
+                        log::debug!("exit");
+                        state.exit = true
+                    },
                 }
             }
         })
         .unwrap();
 
     let insert_registration = WaylandSource::new(connection, event_queue).insert(loop_handle);
-    println!("insert_registration: {:#?}", insert_registration);
+    log::debug!("insert_registration: {:#?}", insert_registration);
 
     if let Err(e) = insert_registration {
         // #[cfg(feature = "debug")]
         let err_msg = format!("Failed to insert wayland source: {:#?}", e);
-        println!("{}", err_msg);
+        log::debug!("{}", err_msg);
         let _ = state.reply_tx.send(Err(e.error.into()));
         // return Err(Error::new(ErrorKind::Other, err_msg));
         return;
@@ -109,11 +119,11 @@ fn worker_impl(
 
     loop {
         let dispatch_resp = event_loop.dispatch(None, &mut state);
-        println!("dispatch_resp: {:?}", dispatch_resp);
+        log::debug!("dispatch_resp: {:?}", dispatch_resp);
         if let Err(e) = dispatch_resp {
             // #[cfg(feature = "debug")]
             let err_msg = format!("Error while dispatching: {:#?}", e);
-            println!("{}", err_msg);
+            log::debug!("{}", err_msg);
             let _ = state.reply_tx.send(Err(e.into()));
             state.exit = true;
         }
@@ -124,5 +134,5 @@ fn worker_impl(
         }
     }
     // }
-    println!("smithay-clipboard worker thread exited");
+    log::debug!("smithay-clipboard worker thread exited");
 }
